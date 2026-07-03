@@ -25,11 +25,9 @@ import net.minecraft.client.util.SpriteIdentifier;
 import net.minecraft.util.Identifier;
 
 public final class ModelWrappingHandler {
-	private static final Map<ModelIdentifier, BlockState> MODEL_ID_2_STATE_MAP = new Object2ObjectOpenHashMap<>();
 	private static final Map<ModelIdentifier, List<CTMLoadingContainer<?>>> MODEL_ID_2_CONTAINERS_MAP = new Object2ObjectOpenHashMap<>();
 
 	public static void onAddBlockStateModel(ModelIdentifier id, BlockState state) {
-		MODEL_ID_2_STATE_MAP.put(id, state);
 		List<CTMLoadingContainer<?>> containerList = CTMPropertiesLoader.getAllAffecting(state);
 		if (containerList != null) {
 			MODEL_ID_2_CONTAINERS_MAP.put(id, containerList);
@@ -69,35 +67,34 @@ public final class ModelWrappingHandler {
 				}
 				containerList.sort(Collections.reverseOrder());
 
-				Set<CTMLoadingContainer<?>> multipassContainerSet = null;
-				int amount = containerList.size();
-				for (int i = 0; i < amount; i++) {
-					CTMLoadingContainer<?> container = containerList.get(i);
-					Set<CTMLoadingContainer<?>> dependents = container.getRecursiveMultipassDependents();
-					if (dependents != null) {
-						if (multipassContainerSet == null) {
-							multipassContainerSet = new ObjectOpenHashSet<>();
-						}
-						multipassContainerSet.addAll(dependents);
+			List<CTMLoadingContainer<?>> multipassContainerList = null;
+			Set<CTMLoadingContainer<?>> multipassContainerSet = null;
+			int amount = containerList.size();
+			for (int i = 0; i < amount; i++) {
+				CTMLoadingContainer<?> container = containerList.get(i);
+				Set<CTMLoadingContainer<?>> dependents = container.getRecursiveMultipassDependents();
+				if (dependents != null) {
+					if (multipassContainerSet == null) {
+						multipassContainerSet = new ObjectOpenHashSet<>();
+					}
+					multipassContainerSet.addAll(dependents);
+				}
+			}
+			if (multipassContainerSet != null) {
+				multipassContainerList = new ObjectArrayList<>();
+				for (CTMLoadingContainer<?> container : multipassContainerSet) {
+					if (!container.getProperties().affectsBlockStates() || container.getProperties().affectsBlockState(null)) {
+						multipassContainerList.add(container);
 					}
 				}
-				List<CTMLoadingContainer<?>> multipassContainerList = null;
-				if (multipassContainerSet != null) {
-					BlockState state = MODEL_ID_2_STATE_MAP.get(modelId);
-					for (CTMLoadingContainer<?> container : multipassContainerSet) {
-						if (!container.getProperties().affectsBlockStates() || container.getProperties().affectsBlockState(state)) {
-							if (multipassContainerList == null) {
-								multipassContainerList = new ObjectArrayList<>();
-							}
-							multipassContainerList.add(container);
-						}
-					}
-					if (multipassContainerList != null) {
-						multipassContainerList.sort(Collections.reverseOrder());
-					}
+				if (!multipassContainerList.isEmpty()) {
+					multipassContainerList.sort(Collections.reverseOrder());
+				} else {
+					multipassContainerList = null;
 				}
+			}
 
-				wrappedModels.put(modelId, new CTMUnbakedModel(model, containerList, multipassContainerList));
+			wrappedModels.put(modelId, new CTMUnbakedModel(model, containerList, multipassContainerList));
 			}
 		});
 
@@ -108,15 +105,16 @@ public final class ModelWrappingHandler {
 	public static void wrapEmissiveModels(Map<Identifier, Pair<SpriteAtlasTexture, SpriteAtlasTexture.Data>> spriteAtlasData, Map<Identifier, UnbakedModel> unbakedModels, Map<Identifier, UnbakedModel> modelsToBake) {
 		Set<SpriteIdentifier> spriteIdsToWrap = new ObjectOpenHashSet<>();
 
-		spriteAtlasData.forEach((atlasId, pair) -> {
-			SpriteAtlasTexture.Data data = pair.getSecond();
+		for (Map.Entry<Identifier, Pair<SpriteAtlasTexture, SpriteAtlasTexture.Data>> entry : spriteAtlasData.entrySet()) {
+			Identifier atlasId = entry.getKey();
+			SpriteAtlasTexture.Data data = entry.getValue().getSecond();
 			Map<Identifier, Identifier> emissiveIdMap = ((SpriteAtlasTextureDataExtension) data).continuity$getEmissiveIdMap();
 			if (emissiveIdMap != null) {
 				for (Identifier id : emissiveIdMap.keySet()) {
 					spriteIdsToWrap.add(new SpriteIdentifier(atlasId, id));
 				}
 			}
-		});
+		}
 
 		if (spriteIdsToWrap.isEmpty()) {
 			return;
@@ -167,7 +165,6 @@ public final class ModelWrappingHandler {
 	}
 
 	private static void clearMaps() {
-		MODEL_ID_2_STATE_MAP.clear();
 		MODEL_ID_2_CONTAINERS_MAP.clear();
 	}
 

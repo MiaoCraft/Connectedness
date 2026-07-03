@@ -9,7 +9,6 @@ public class ModelObjectsContainer {
 
 	public final CTMBakedModel.CTMQuadTransform ctmQuadTransform = new CTMBakedModel.CTMQuadTransform();
 	public final EmissiveBakedModel.EmissiveBlockQuadTransform emissiveBlockQuadTransform = new EmissiveBakedModel.EmissiveBlockQuadTransform();
-	public final EmissiveBakedModel.EmissiveItemQuadTransform emissiveItemQuadTransform = new EmissiveBakedModel.EmissiveItemQuadTransform();
 
 	public final ContinuityFeatureStatesImpl featureStates = new ContinuityFeatureStatesImpl();
 	public final MeshBuilder meshBuilder = RendererAccess.INSTANCE.getRenderer().meshBuilder();

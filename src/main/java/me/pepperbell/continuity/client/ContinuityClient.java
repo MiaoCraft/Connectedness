@@ -37,6 +37,9 @@ import me.pepperbell.continuity.client.properties.overlay.RepeatOverlayCTMProper
 import me.pepperbell.continuity.client.properties.overlay.StandardConnectingOverlayCTMProperties;
 import me.pepperbell.continuity.client.properties.overlay.StandardOverlayCTMProperties;
 import me.pepperbell.continuity.client.resource.CustomBlockLayers;
+import me.pepperbell.continuity.client.resource.ModelWrappingHandler;
+import me.pepperbell.continuity.client.model.EmissiveBakedModel;
+import me.pepperbell.continuity.client.util.EmissiveQuadModifier;
 import me.pepperbell.continuity.client.util.RenderUtil;
 import me.pepperbell.continuity.client.util.biome.BiomeHolderManager;
 import me.pepperbell.continuity.client.util.biome.BiomeRetriever;
@@ -56,6 +59,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.network.NetworkConstants;
 import net.minecraftforge.resource.PathPackResources;
+import net.minecraftforge.client.event.ModelEvent;
 
 @Mod(ContinuityClient.ID)
 public class ContinuityClient {
@@ -63,32 +67,17 @@ public class ContinuityClient {
 	public static final String NAME = "Connectedness";
 	public static final Logger LOGGER = LoggerFactory.getLogger(NAME);
 
-	public ContinuityClient() {		
+	public ContinuityClient() {
 		ProcessingDataKeyRegistryImpl.INSTANCE.init();
 		BiomeHolderManager.init();
 		BiomeRetriever.init();
 		ProcessingDataKeys.init();
 		RenderUtil.ReloadListener.init();
 		CustomBlockLayers.ReloadListener.init();
-		
+
 		FMLJavaModLoadingContext.get().getModEventBus().register(this);
-		
+
 		ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class, () -> new IExtensionPoint.DisplayTest(() -> NetworkConstants.IGNORESERVERONLY, (a, b) -> true));
-
-		// Regular methods
-
-		/*
-		"ctm" "glass"
-		"ctm_compact"
-		"horizontal" "bookshelf"
-		"vertical"
-		"horizontal+vertical" "h+v"
-		"vertical+horizontal" "v+h"
-		"top"
-		"random"
-		"repeat"
-		"fixed"
-		 */
 
 		CTMLoaderRegistry registry = CTMLoaderRegistry.get();
 		CTMLoader<?> loader;
@@ -166,16 +155,6 @@ public class ContinuityClient {
 		);
 		registry.registerLoader("fixed", loader);
 
-		// Overlay methods
-
-		/*
-		"overlay"
-		"overlay_ctm"
-		"overlay_random"
-		"overlay_repeat"
-		"overlay_fixed"
-		 */
-
 		loader = createLoader(
 				StandardOverlayCTMProperties::new,
 				new TileAmountValidator.AtLeast<>(17),
@@ -211,12 +190,12 @@ public class ContinuityClient {
 		registry.registerLoader("overlay_fixed", loader);
 	}
 
-	private static <T extends BaseCTMProperties> CTMLoader<T> createLoader(CTMPropertiesFactory<T> propertiesFactory, TileAmountValidator<T> validator, QuadProcessorFactory<T> processorFactory) {
-		return CTMLoader.of(wrapWithOptifineOnlyCheck(TileAmountValidator.wrapFactory(BaseCTMProperties.wrapFactory(propertiesFactory), validator)), processorFactory);
-	}
-
 	private static <T extends BaseCTMProperties> CTMLoader<T> createLoader(CTMPropertiesFactory<T> propertiesFactory, QuadProcessorFactory<T> processorFactory) {
 		return CTMLoader.of(wrapWithOptifineOnlyCheck(BaseCTMProperties.wrapFactory(propertiesFactory)), processorFactory);
+	}
+
+	private static <T extends BaseCTMProperties> CTMLoader<T> createLoader(CTMPropertiesFactory<T> propertiesFactory, TileAmountValidator<T> validator, QuadProcessorFactory<T> processorFactory) {
+		return CTMLoader.of(wrapWithOptifineOnlyCheck(TileAmountValidator.wrapFactory(BaseCTMProperties.wrapFactory(propertiesFactory), validator)), processorFactory);
 	}
 
 	private static <T extends CTMProperties> CTMPropertiesFactory<T> wrapWithOptifineOnlyCheck(CTMPropertiesFactory<T> factory) {
@@ -231,7 +210,7 @@ public class ContinuityClient {
 	public static Identifier asId(String path) {
 		return new Identifier(ID, path);
 	}
-	
+
 	@SubscribeEvent
 	public void addDefaultPack(AddPackFindersEvent event) {
 		try {
@@ -250,7 +229,7 @@ public class ContinuityClient {
 			throw new RuntimeException(ex);
 		}
 	}
-	
+
 	@SubscribeEvent
 	public void addGlassPack(AddPackFindersEvent event) {
 		try {
@@ -269,5 +248,18 @@ public class ContinuityClient {
 			throw new RuntimeException(ex);
 		}
 	}
-	
+
+	@SubscribeEvent
+	public void onBakingCompleted(ModelEvent.BakingCompleted event) {
+		java.util.Map<net.minecraft.util.Identifier, net.minecraft.client.render.model.BakedModel> models = event.getModels();
+		for (java.util.Map.Entry<net.minecraft.util.Identifier, net.minecraft.client.render.model.BakedModel> entry : models.entrySet()) {
+			net.minecraft.client.render.model.BakedModel model = entry.getValue();
+			if (model instanceof EmissiveBakedModel) continue;
+
+			if (EmissiveQuadModifier.modelHasEmissiveQuads(model)) {
+				models.put(entry.getKey(), new EmissiveBakedModel(model));
+			}
+		}
+	}
+
 }

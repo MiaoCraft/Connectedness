@@ -1,9 +1,11 @@
 package me.pepperbell.continuity.client.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
 
-import me.pepperbell.continuity.api.client.EmissiveSpriteApi;
 import me.pepperbell.continuity.client.config.ContinuityConfig;
+import me.pepperbell.continuity.client.util.EmissiveQuadModifier;
 import me.pepperbell.continuity.client.util.QuadUtil;
 import me.pepperbell.continuity.client.util.RenderUtil;
 import net.fabricmc.fabric.api.renderer.v1.material.BlendMode;
@@ -18,9 +20,11 @@ import net.minecraft.block.BlockState;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.model.BakedModel;
+import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.BlockRenderView;
 
@@ -78,40 +82,19 @@ public class EmissiveBakedModel extends ForwardingBakedModel {
 	}
 
 	@Override
-	public void emitItemQuads(ItemStack stack, Supplier<Random> randomSupplier, RenderContext context) {
+	public List<BakedQuad> getQuads(BlockState state, Direction face, Random random) {
+		List<BakedQuad> baseQuads = wrapped.getQuads(state, face, random);
 		if (!ContinuityConfig.INSTANCE.emissiveTextures.get()) {
-			super.emitItemQuads(stack, randomSupplier, context);
-			return;
+			return baseQuads;
 		}
-
-		ModelObjectsContainer container = ModelObjectsContainer.get();
-		if (!container.featureStates.getEmissiveTexturesState().isEnabled()) {
-			super.emitItemQuads(stack, randomSupplier, context);
-			return;
+		List<BakedQuad> emissiveQuads = EmissiveQuadModifier.createEmissiveQuads(baseQuads);
+		if (emissiveQuads.isEmpty()) {
+			return baseQuads;
 		}
-
-		EmissiveItemQuadTransform quadTransform = container.emissiveItemQuadTransform;
-		if (quadTransform.isActive()) {
-			super.emitItemQuads(stack, randomSupplier, context);
-			return;
-		}
-
-		MeshBuilder meshBuilder = container.meshBuilder;
-		quadTransform.prepare(meshBuilder.getEmitter());
-
-		context.pushTransform(quadTransform);
-		super.emitItemQuads(stack, randomSupplier, context);
-		context.popTransform();
-
-		if (quadTransform.didEmit()) {
-			context.meshConsumer().accept(meshBuilder.build());
-		}
-		quadTransform.reset();
-	}
-
-	@Override
-	public boolean isVanillaAdapter() {
-		return false;
+		List<BakedQuad> allQuads = new ArrayList<>(baseQuads.size() + emissiveQuads.size());
+		allQuads.addAll(baseQuads);
+		allQuads.addAll(emissiveQuads);
+		return allQuads;
 	}
 
 	protected static class EmissiveBlockQuadTransform implements RenderContext.QuadTransform {
@@ -135,7 +118,7 @@ public class EmissiveBakedModel extends ForwardingBakedModel {
 			}
 
 			Sprite sprite = RenderUtil.getSpriteFinder().find(quad, 0);
-			Sprite emissiveSprite = EmissiveSpriteApi.get().getEmissiveSprite(sprite);
+			Sprite emissiveSprite = me.pepperbell.continuity.api.client.EmissiveSpriteApi.get().getEmissiveSprite(sprite);
 			if (emissiveSprite != null) {
 				quad.copyTo(emitter);
 
@@ -197,47 +180,6 @@ public class EmissiveBakedModel extends ForwardingBakedModel {
 			useManualCulling = false;
 
 			active = false;
-		}
-	}
-
-	protected static class EmissiveItemQuadTransform implements RenderContext.QuadTransform {
-		protected QuadEmitter emitter;
-
-		protected boolean active;
-		protected boolean didEmit;
-
-		@Override
-		public boolean transform(MutableQuadView quad) {
-			Sprite sprite = RenderUtil.getSpriteFinder().find(quad, 0);
-			Sprite emissiveSprite = EmissiveSpriteApi.get().getEmissiveSprite(sprite);
-			if (emissiveSprite != null) {
-				quad.copyTo(emitter);
-				emitter.material(DEFAULT_EMISSIVE_MATERIAL);
-				QuadUtil.interpolate(emitter, sprite, emissiveSprite);
-				emitter.emit();
-				didEmit = true;
-			}
-			return true;
-		}
-
-		public boolean isActive() {
-			return active;
-		}
-
-		public boolean didEmit() {
-			return didEmit;
-		}
-
-		public void prepare(QuadEmitter emitter) {
-			this.emitter = emitter;
-
-			active = true;
-			didEmit = false;
-		}
-
-		public void reset() {
-			active = false;
-			emitter = null;
 		}
 	}
 }

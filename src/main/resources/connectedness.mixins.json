@@ -18,6 +18,7 @@
     "SpriteAtlasTextureDataMixin",
     "SpriteAtlasTextureMixin",
     "SpriteMixin",
+	"ItemRendererMixin",
 	"ClientPlayNetworkHandlerMixin"
   ],
   "injectors": {

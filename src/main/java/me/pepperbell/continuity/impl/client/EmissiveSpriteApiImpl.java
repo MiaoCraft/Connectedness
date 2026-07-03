@@ -12,6 +12,10 @@ public final class EmissiveSpriteApiImpl implements EmissiveSpriteApi {
 	@Override
 	@Nullable
 	public Sprite getEmissiveSprite(Sprite sprite) {
-		return ((SpriteExtension) sprite).continuity$getEmissiveSprite();
+		Sprite emissive = ((SpriteExtension) sprite).continuity$getEmissiveSprite();
+		if (emissive != null) {
+			return emissive;
+		}
+		return null;
 	}
 }

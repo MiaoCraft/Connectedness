@@ -196,6 +196,60 @@ public final class CTMPropertiesLoader {
 		return LIST_CREATOR.get();
 	}
 
+	// Gets all containers (both AFFECTS_BLOCK and IGNORES_BLOCK) whose properties
+	// affect any of the given sprite IDs. Used as fallback when block state context
+	// is unavailable (e.g. onAddBlockStateModel was not called).
+	public static void consumeAllAffectingByTexture(Collection<SpriteIdentifier> spriteIds, Consumer<CTMLoadingContainer<?>> consumer) {
+		int amount = IGNORES_BLOCK.size();
+		for (int i = 0; i < amount; i++) {
+			CTMLoadingContainer<?> container = IGNORES_BLOCK.get(i);
+			for (SpriteIdentifier spriteId : spriteIds) {
+				if (container.getProperties().affectsTexture(spriteId.getTextureId())) {
+					consumer.accept(container);
+					break;
+				}
+			}
+		}
+		amount = AFFECTS_BLOCK.size();
+		for (int i = 0; i < amount; i++) {
+			CTMLoadingContainer<?> container = AFFECTS_BLOCK.get(i);
+			for (SpriteIdentifier spriteId : spriteIds) {
+				if (container.getProperties().affectsTexture(spriteId.getTextureId())) {
+					consumer.accept(container);
+					break;
+				}
+			}
+		}
+	}
+
+	@Nullable
+	public static List<CTMLoadingContainer<?>> getAllAffectingByTexture(Collection<SpriteIdentifier> spriteIds) {
+		consumeAllAffectingByTexture(spriteIds, LIST_CREATOR);
+		return LIST_CREATOR.get();
+	}
+
+	// Gets containers from AFFECTS_BLOCK whose properties match any state of the given block.
+	// Needed for CTM properties that use matchBlocks without matchTiles (e.g. glass).
+	public static void consumeAllAffectingByBlock(net.minecraft.block.Block block, Consumer<CTMLoadingContainer<?>> consumer) {
+		java.util.Collection<net.minecraft.block.BlockState> states = block.getStateManager().getStates();
+		int amount = AFFECTS_BLOCK.size();
+		for (int i = 0; i < amount; i++) {
+			CTMLoadingContainer<?> container = AFFECTS_BLOCK.get(i);
+			for (net.minecraft.block.BlockState state : states) {
+				if (container.getProperties().affectsBlockState(state)) {
+					consumer.accept(container);
+					break;
+				}
+			}
+		}
+	}
+
+	@Nullable
+	public static List<CTMLoadingContainer<?>> getAllAffectingByBlock(net.minecraft.block.Block block) {
+		consumeAllAffectingByBlock(block, LIST_CREATOR);
+		return LIST_CREATOR.get();
+	}
+
 	public static boolean isEmpty() {
 		return ALL.isEmpty();
 	}

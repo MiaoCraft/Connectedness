@@ -17,12 +17,14 @@ import me.pepperbell.continuity.client.mixinterface.SpriteAtlasTextureDataExtens
 import me.pepperbell.continuity.client.model.CTMUnbakedModel;
 import me.pepperbell.continuity.client.model.EmissiveUnbakedModel;
 import me.pepperbell.continuity.client.util.VoidSet;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.render.model.UnbakedModel;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.ModelIdentifier;
 import net.minecraft.client.util.SpriteIdentifier;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.registry.Registry;
 
 public final class ModelWrappingHandler {
 	private static final Map<ModelIdentifier, List<CTMLoadingContainer<?>>> MODEL_ID_2_CONTAINERS_MAP = new Object2ObjectOpenHashMap<>();
@@ -57,7 +59,24 @@ public final class ModelWrappingHandler {
 
 				List<CTMLoadingContainer<?>> containerList = MODEL_ID_2_CONTAINERS_MAP.get(modelId);
 				if (containerList == null) {
-					containerList = CTMPropertiesLoader.getAllAffecting(dependencies);
+					containerList = CTMPropertiesLoader.getAllAffectingByTexture(dependencies);
+					// Also check by block for matchBlocks-only properties (e.g. glass CTM)
+					Identifier blockId = new Identifier(modelId.getNamespace(), modelId.getPath());
+					if (Registry.BLOCK.containsId(blockId)) {
+						Block block = Registry.BLOCK.get(blockId);
+						List<CTMLoadingContainer<?>> blockList = CTMPropertiesLoader.getAllAffectingByBlock(block);
+						if (blockList != null) {
+							if (containerList == null) {
+								containerList = blockList;
+							} else {
+								for (CTMLoadingContainer<?> c : blockList) {
+									if (!containerList.contains(c)) {
+										containerList.add(c);
+									}
+								}
+							}
+						}
+					}
 					if (containerList == null) {
 						return;
 					}
@@ -81,17 +100,8 @@ public final class ModelWrappingHandler {
 				}
 			}
 			if (multipassContainerSet != null) {
-				multipassContainerList = new ObjectArrayList<>();
-				for (CTMLoadingContainer<?> container : multipassContainerSet) {
-					if (!container.getProperties().affectsBlockStates() || container.getProperties().affectsBlockState(null)) {
-						multipassContainerList.add(container);
-					}
-				}
-				if (!multipassContainerList.isEmpty()) {
-					multipassContainerList.sort(Collections.reverseOrder());
-				} else {
-					multipassContainerList = null;
-				}
+				multipassContainerList = new ObjectArrayList<>(multipassContainerSet);
+				multipassContainerList.sort(Collections.reverseOrder());
 			}
 
 			wrappedModels.put(modelId, new CTMUnbakedModel(model, containerList, multipassContainerList));

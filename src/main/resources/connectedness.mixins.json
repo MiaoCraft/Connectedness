@@ -15,6 +15,7 @@
     "PistonBlockEntityRendererMixin",
     "ReloadableResourceManagerImplAccessor",
     "RenderLayersMixin",
+    "RenderSystemAccessor",
     "SpriteAtlasTextureDataMixin",
     "SpriteAtlasTextureMixin",
     "SpriteMixin",
